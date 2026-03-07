@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useContext } from 'react';
 import { GlobalContext } from "./GlobalContext";
 import './../assets/scss/app.scss';
 
-import { DEFAULT_APP_SETTINGS, ESCAPP_CLIENT_SETTINGS, MAIN_SCREEN } from '../constants/constants.jsx';
+import { DEFAULT_APP_SETTINGS, SKIN_SETTINGS_RETRO, SKIN_SETTINGS_FUTURISTIC, ESCAPP_CLIENT_SETTINGS, MAIN_SCREEN } from '../constants/constants.jsx';
 import MainScreen from './MainScreen.jsx';
 
 export default function App() {
@@ -41,12 +41,28 @@ export default function App() {
   }, []);
 
   function processAppSettings(_appSettings) {
-    if (typeof _appSettings !== "object") {
+    if (_appSettings === null || typeof _appSettings !== "object") {
       _appSettings = {};
     }
 
-    // Merge _appSettings with DEFAULT_APP_SETTINGS to obtain final app settings
-    _appSettings = Utils.deepMerge(DEFAULT_APP_SETTINGS, _appSettings);
+    // Determine skin settings
+    let skinSettings = {};
+    const skin = _appSettings.skin || DEFAULT_APP_SETTINGS.skin;
+    switch (skin) {
+      case "RETRO":
+        skinSettings = SKIN_SETTINGS_RETRO;
+        break;
+      case "FUTURISTIC":
+        skinSettings = SKIN_SETTINGS_FUTURISTIC;
+        break;
+      default:
+        // STANDARD skin uses default settings
+        break;
+    }
+
+    // Merge: DEFAULT -> SKIN -> USER CONFIG
+    let settingsWithSkin = Utils.deepMerge(DEFAULT_APP_SETTINGS, skinSettings);
+    _appSettings = Utils.deepMerge(settingsWithSkin, _appSettings);
 
     const allowedActions = ["NONE", "SHOW_MESSAGE"];
     if (!allowedActions.includes(_appSettings.actionAfterSolve)) {

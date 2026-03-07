@@ -1,6 +1,9 @@
 //Copy this file to config.js and specify your own settings
 
 export let ESCAPP_APP_SETTINGS = {
+  // Skin: "STANDARD", "RETRO", or "FUTURISTIC"
+  skin: "STANDARD",
+
   // Base background (takes all space)
   background: "https://example.com/background.jpg",
 
@@ -25,39 +28,73 @@ export let ESCAPP_APP_SETTINGS = {
   popupWidth: 350,
   // Optional title for the popup
   popupTitle: "Question",
+  // Allow the popup to be minimized
+  popupMinimizable: true,
+  // Start with the popup minimized (optional)
+  // popupStartMinimized: false,
 
-  // Question to display
-  question: "What is the answer?",
-
-  // Input settings
-  // inputType can be "TEXT", "NUMERIC", or "SELECT"
-  inputType: "TEXT",
-  // Placeholder text for the input field
-  inputPlaceholder: "Enter your answer...",
-
-  // Options for SELECT type (array of {value, label} objects)
-  // selectOptions: [
+  // ============================================================
+  // SINGLE QUESTION MODE
+  // Use this for a single question (simpler configuration)
+  // ============================================================
+  // question: "What is the answer?",
+  // inputType: "TEXT",  // "TEXT", "NUMERIC", or "SELECT"
+  // inputPlaceholder: "Enter your answer...",
+  // selectOptions: [    // Only for SELECT type
   //   { value: "option1", label: "Option 1" },
   //   { value: "option2", label: "Option 2" },
-  //   { value: "option3", label: "Option 3" }
   // ],
+
+  // ============================================================
+  // MULTIPLE QUESTIONS MODE
+  // Use this for multiple questions (overrides single question)
+  // Answers are combined with semicolons (e.g., "answer1;answer2;answer3")
+  // ============================================================
+  questions: [
+    {
+      question: "What is 2 + 2?",
+      inputType: "NUMERIC",
+      inputPlaceholder: "Enter number..."
+    },
+    {
+      question: "Select the primary color:",
+      inputType: "SELECT",
+      selectOptions: [
+        { value: "red", label: "Red" },
+        { value: "green", label: "Green" },
+        { value: "blue", label: "Blue" }
+      ]
+    },
+    {
+      question: "What is the capital of France?",
+      inputType: "TEXT",
+      inputPlaceholder: "Enter city name..."
+    }
+  ],
 
   // Button text
   submitButtonText: "Submit",
+  continueButtonText: "Continue",  // Text for the continue button after solving
+  errorMessage: "Incorrect answer. Try again.",  // Error message when answer is wrong
 
   // Action after solve: "NONE" or "SHOW_MESSAGE"
   actionAfterSolve: "SHOW_MESSAGE",
   // Custom message to show after solving (optional)
-  // message: "Congratulations!",
+  message: "Congratulations! You solved the puzzle!",
 
-  // Popup styling (optional)
+  // Popup styling (comment out to use skin defaults)
   // popupBackgroundColor: "#ffffff",
   // popupTextColor: "#333333",
   // popupBorderRadius: 12,
   // popupPadding: 24,
 
+  // Button styling (comment out to use skin defaults)
+  // buttonColor: "#3498db",
+  // buttonTextColor: "#ffffff",
+  // buttonSuccessColor: "#27ae60",
+
   // Locale: "en", "es", or "sr"
-  locale: "es",
+  locale: "en",
 
   // Escapp integration settings
   escappClientSettings: {

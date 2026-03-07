@@ -1,14 +1,38 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { GlobalContext } from "./GlobalContext";
 import './../assets/scss/main.scss';
 
 const MainScreen = (props) => {
   const { escapp, appSettings, Utils, I18n } = useContext(GlobalContext);
-  const [inputValue, setInputValue] = useState('');
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [showError, setShowError] = useState(false);
   const [solved, setSolved] = useState(false);
-  const [minimized, setMinimized] = useState(appSettings.popupStartMinimized || false);
+  const [minimized, setMinimized] = useState(false);
+  const [answers, setAnswers] = useState(null);
+  const [initialized, setInitialized] = useState(false);
+
+  // Determine if using multiple questions mode
+  const hasMultipleQuestions = appSettings?.questions && Array.isArray(appSettings.questions) && appSettings.questions.length > 0;
+  const questions = hasMultipleQuestions ? appSettings.questions : null;
+
+  // Initialize answers and minimized state when appSettings is ready
+  useEffect(() => {
+    if (appSettings && !initialized) {
+      if (hasMultipleQuestions) {
+        setAnswers(appSettings.questions.reduce((acc, _, idx) => ({ ...acc, [idx]: '' }), {}));
+      } else {
+        setAnswers('');
+      }
+      setMinimized(appSettings.popupStartMinimized || false);
+      setInitialized(true);
+    }
+  }, [appSettings, hasMultipleQuestions, initialized]);
+
+  // Don't render until initialized
+  if (!initialized || !appSettings || answers === null) {
+    return null;
+  }
 
   const getPopupPositionStyle = () => {
     const position = appSettings.popupPosition || 'BOTTOM_RIGHT';
@@ -43,17 +67,33 @@ const MainScreen = (props) => {
     return styles;
   };
 
+  const getSolution = () => {
+    if (questions && answers && typeof answers === 'object') {
+      // Multiple questions: combine answers with semicolons
+      return Object.values(answers).map(a => (a || '').trim()).join(';');
+    }
+    // Single question
+    return typeof answers === 'string' ? answers.trim() : '';
+  };
+
+  const allAnswersFilled = () => {
+    if (questions && answers && typeof answers === 'object') {
+      return Object.values(answers).every(a => (a || '').trim() !== '');
+    }
+    return typeof answers === 'string' && answers.trim() !== '';
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (isProcessing || !inputValue.trim()) {
+    if (isProcessing || !allAnswersFilled()) {
       return;
     }
 
     setIsProcessing(true);
     setShowError(false);
 
-    const solution = inputValue.trim();
+    const solution = getSolution();
     Utils.log("Check solution", solution);
 
     escapp.checkNextPuzzle(solution, {}, (success, erState) => {
@@ -80,43 +120,57 @@ const MainScreen = (props) => {
     props.submitPuzzleSolution();
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e, index = null, inputType = null) => {
     let value = e.target.value;
+    const type = inputType || appSettings.inputType;
 
     // For numeric input, only allow numbers
-    if (appSettings.inputType === 'NUMERIC') {
+    if (type === 'NUMERIC') {
       value = value.replace(/[^0-9]/g, '');
     }
 
-    setInputValue(value);
+    if (questions && index !== null) {
+      setAnswers(prev => ({ ...prev, [index]: value }));
+    } else {
+      setAnswers(value);
+    }
     setShowError(false);
   };
 
-  const renderInput = () => {
-    const inputType = appSettings.inputType || 'TEXT';
-    const commonStyles = {
+  const getInputStyles = (hasError = false) => {
+    return {
       width: '100%',
       padding: '12px',
       fontSize: '16px',
-      border: showError ? '2px solid #e74c3c' : '1px solid #ccc',
+      fontFamily: appSettings.fontFamily,
+      border: hasError
+        ? `2px solid ${appSettings.errorColor}`
+        : `1px solid ${appSettings.inputBorderColor}`,
       borderRadius: '6px',
       boxSizing: 'border-box',
       outline: 'none',
-      transition: 'border-color 0.2s',
+      transition: 'border-color 0.2s, box-shadow 0.2s',
+      backgroundColor: appSettings.inputBackground || '#ffffff',
+      color: appSettings.inputTextColor || appSettings.popupTextColor,
     };
+  };
+
+  const renderSingleInput = (inputType, value, onChange, placeholder, selectOptions, disabled) => {
+    const commonStyles = getInputStyles(showError);
 
     switch (inputType) {
       case 'SELECT':
         return (
           <select
-            value={inputValue}
-            onChange={handleInputChange}
+            value={value}
+            onChange={onChange}
             style={commonStyles}
-            disabled={isProcessing}
+            disabled={disabled}
+            className="popup-input"
           >
-            <option value="">{appSettings.inputPlaceholder || 'Select an option...'}</option>
-            {(appSettings.selectOptions || []).map((option, index) => (
-              <option key={index} value={option.value}>
+            <option value="">{placeholder || 'Select an option...'}</option>
+            {(selectOptions || []).map((option, idx) => (
+              <option key={idx} value={option.value}>
                 {option.label}
               </option>
             ))}
@@ -129,12 +183,13 @@ const MainScreen = (props) => {
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
-            value={inputValue}
-            onChange={handleInputChange}
-            placeholder={appSettings.inputPlaceholder || 'Enter a number...'}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder || 'Enter a number...'}
             style={commonStyles}
-            disabled={isProcessing}
+            disabled={disabled}
             autoComplete="off"
+            className="popup-input"
           />
         );
 
@@ -143,15 +198,42 @@ const MainScreen = (props) => {
         return (
           <input
             type="text"
-            value={inputValue}
-            onChange={handleInputChange}
-            placeholder={appSettings.inputPlaceholder || 'Enter your answer...'}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder || 'Enter your answer...'}
             style={commonStyles}
-            disabled={isProcessing}
+            disabled={disabled}
             autoComplete="off"
+            className="popup-input"
           />
         );
     }
+  };
+
+  const renderQuestionInput = (questionConfig, index) => {
+    const { question, inputType = 'TEXT', inputPlaceholder = '', selectOptions = [] } = questionConfig;
+    const value = answers[index] || '';
+
+    return (
+      <div key={index} style={{ marginBottom: index < questions.length - 1 ? '16px' : '0' }}>
+        <label className="popup-question" style={{
+          display: 'block',
+          marginBottom: '8px',
+          fontSize: '14px',
+          fontWeight: '500',
+        }}>
+          {question}
+        </label>
+        {renderSingleInput(
+          inputType,
+          value,
+          (e) => handleInputChange(e, index, inputType),
+          inputPlaceholder,
+          selectOptions,
+          isProcessing
+        )}
+      </div>
+    );
   };
 
   const parsePosition = (value) => {
@@ -227,13 +309,38 @@ const MainScreen = (props) => {
     );
   };
 
+  const getButtonStyle = (isSuccess = false, disabled = false) => {
+    const bgColor = isSuccess
+      ? appSettings.buttonSuccessColor
+      : (disabled ? '#ccc' : appSettings.buttonColor);
+
+    const isGradient = bgColor && bgColor.includes('gradient');
+
+    return {
+      width: '100%',
+      padding: '12px',
+      fontSize: '16px',
+      fontWeight: '600',
+      fontFamily: appSettings.fontFamily,
+      background: isGradient ? bgColor : 'none',
+      backgroundColor: isGradient ? undefined : bgColor,
+      color: appSettings.buttonTextColor || '#ffffff',
+      border: 'none',
+      borderRadius: '6px',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      transition: 'all 0.2s',
+    };
+  };
+
   const popupStyle = {
     ...getPopupPositionStyle(),
-    backgroundColor: appSettings.popupBackgroundColor || '#ffffff',
-    color: appSettings.popupTextColor || '#333333',
-    borderRadius: appSettings.popupBorderRadius || 8,
-    padding: appSettings.popupPadding || 20,
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+    backgroundColor: appSettings.popupBackgroundColor,
+    color: appSettings.popupTextColor,
+    borderRadius: appSettings.popupBorderRadius,
+    padding: appSettings.popupPadding,
+    fontFamily: appSettings.fontFamily,
+    boxShadow: appSettings.boxShadow || '0 4px 20px rgba(0, 0, 0, 0.15)',
+    border: appSettings.popupBorder || 'none',
   };
 
   const renderPopupContent = () => {
@@ -246,32 +353,54 @@ const MainScreen = (props) => {
             lineHeight: '1.5',
             margin: '0 0 16px 0',
           }}>
-            {appSettings.message || I18n.getTrans("i.message")}
+            {appSettings.message}
           </p>
 
           <button
             type="button"
             onClick={handleContinue}
-            style={{
-              width: '100%',
-              padding: '12px',
-              fontSize: '16px',
-              fontWeight: '600',
-              backgroundColor: '#27ae60',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              transition: 'background-color 0.2s',
-            }}
+            style={getButtonStyle(true)}
+            className="popup-button popup-button-success"
           >
-            {I18n.getTrans("i.continue") || 'Continue'}
+            {appSettings.continueButtonText || I18n.getTrans("i.continue") || 'Continue'}
           </button>
         </>
       );
     }
 
     // Question form view
+    if (questions) {
+      // Multiple questions mode
+      return (
+        <form onSubmit={handleSubmit}>
+          {questions.map((q, idx) => renderQuestionInput(q, idx))}
+
+          {showError && (
+            <p style={{
+              color: appSettings.errorColor,
+              fontSize: '13px',
+              margin: '8px 0 0 0',
+            }}>
+              {appSettings.errorMessage || 'Incorrect answer. Try again.'}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={isProcessing || !allAnswersFilled()}
+            style={{
+              ...getButtonStyle(false, isProcessing || !allAnswersFilled()),
+              marginTop: '16px',
+            }}
+            className="popup-button"
+          >
+            {isProcessing ? 'Checking...' : (appSettings.submitButtonText || 'Submit')}
+          </button>
+        </form>
+      );
+    }
+
+    // Single question mode
     return (
       <form onSubmit={handleSubmit}>
         <label className="popup-question" style={{
@@ -283,34 +412,33 @@ const MainScreen = (props) => {
           {appSettings.question || 'Enter your answer:'}
         </label>
 
-        {renderInput()}
+        {renderSingleInput(
+          appSettings.inputType || 'TEXT',
+          answers,
+          (e) => handleInputChange(e),
+          appSettings.inputPlaceholder,
+          appSettings.selectOptions,
+          isProcessing
+        )}
 
         {showError && (
           <p style={{
-            color: '#e74c3c',
+            color: appSettings.errorColor,
             fontSize: '13px',
             margin: '8px 0 0 0',
           }}>
-            Incorrect answer. Try again.
+            {appSettings.errorMessage || 'Incorrect answer. Try again.'}
           </p>
         )}
 
         <button
           type="submit"
-          disabled={isProcessing || !inputValue.trim()}
+          disabled={isProcessing || !allAnswersFilled()}
           style={{
-            width: '100%',
+            ...getButtonStyle(false, isProcessing || !allAnswersFilled()),
             marginTop: '16px',
-            padding: '12px',
-            fontSize: '16px',
-            fontWeight: '600',
-            backgroundColor: isProcessing ? '#ccc' : '#3498db',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: isProcessing ? 'not-allowed' : 'pointer',
-            transition: 'background-color 0.2s',
           }}
+          className="popup-button"
         >
           {isProcessing ? 'Checking...' : (appSettings.submitButtonText || 'Submit')}
         </button>
@@ -324,11 +452,13 @@ const MainScreen = (props) => {
 
   const minimizedStyle = {
     ...getPopupPositionStyle(),
-    backgroundColor: appSettings.popupBackgroundColor || '#ffffff',
-    color: appSettings.popupTextColor || '#333333',
-    borderRadius: appSettings.popupBorderRadius || 8,
+    backgroundColor: appSettings.popupBackgroundColor,
+    color: appSettings.popupTextColor,
+    borderRadius: appSettings.popupBorderRadius,
     padding: '12px 16px',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+    fontFamily: appSettings.fontFamily,
+    boxShadow: appSettings.boxShadow || '0 4px 20px rgba(0, 0, 0, 0.15)',
+    border: appSettings.popupBorder || 'none',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -337,11 +467,11 @@ const MainScreen = (props) => {
 
   if (minimized && appSettings.popupMinimizable) {
     return (
-      <div id="screen_main" className="screen_content">
+      <div id="screen_main" className={`screen_content skin-${(appSettings.skin || 'standard').toLowerCase()}`}>
         {renderBackground()}
         {renderContent()}
 
-        <div className="popup popup-minimized" style={minimizedStyle} onClick={toggleMinimize}>
+        <div className="popup popup-minimized" style={minimizedStyle} onClick={toggleMinimize} title={I18n.getTrans("i.expand") || "Expand"}>
           <span style={{ fontSize: '16px' }}>+</span>
           <span style={{ fontSize: '14px', fontWeight: '500' }}>
             {appSettings.popupTitle || 'Answer'}
@@ -352,7 +482,7 @@ const MainScreen = (props) => {
   }
 
   return (
-    <div id="screen_main" className="screen_content">
+    <div id="screen_main" className={`screen_content skin-${(appSettings.skin || 'standard').toLowerCase()}`}>
       {renderBackground()}
       {renderContent()}
 
@@ -384,10 +514,10 @@ const MainScreen = (props) => {
                 cursor: 'pointer',
                 padding: '0 4px',
                 lineHeight: 1,
-                color: appSettings.popupTextColor || '#333333',
+                color: appSettings.popupTextColor,
                 marginLeft: 'auto',
               }}
-              title="Minimize"
+              title={I18n.getTrans("i.minimize") || "Minimize"}
             >
               −
             </button>

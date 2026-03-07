@@ -5,6 +5,14 @@ export function log (...args) {
 };
 
 export function deepMerge(h1,h2){
+  // Handle null values explicitly (typeof null === "object" in JS)
+  if(h1 === null || h2 === null){
+    if(typeof h2 !== "undefined"){
+      return h2;
+    } else {
+      return h1;
+    }
+  }
   if((typeof h1 === "object")&&(typeof h2 === "object")&&(!(h1 instanceof Array))){
     let keys = Object.keys(Object.assign({},h1,h2));
     let keysL = keys.length;

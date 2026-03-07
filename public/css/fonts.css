@@ -3,6 +3,11 @@
   src: url('../fonts/MetalMania-Regular.ttf') format('truetype');
 }
 
+@font-face {
+  font-family: 'Metalmania';
+  src: url('../fonts/MetalMania-Regular.ttf') format('truetype');
+}
+
 /* cyrillic-ext */
 @font-face {
   font-family: 'Roboto';

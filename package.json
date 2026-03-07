@@ -1,12 +1,12 @@
 {
-  "name": "MiniFormPuzzle",
+  "name": "PopupQuestion",
   "version": "1.0.0",
   "description": "A web app for creating escape room puzzles for the Escapp platform",
   "author": "sonsoleslp",
   "license": "GNU General Public License v3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/iglue-project/keypad_puzzle"
+    "url": "https://github.com/iglue-project/miniform_puzzle"
   },
   "type": "module",
   "scripts": {
