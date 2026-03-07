@@ -1,8 +1,8 @@
 {
-  "name": "EscappKeypadPuzzle",
+  "name": "MiniFormPuzzle",
   "version": "1.0.0",
   "description": "A web app for creating escape room puzzles for the Escapp platform",
-  "author": "GING UPM",
+  "author": "sonsoleslp",
   "license": "GNU General Public License v3.0",
   "repository": {
     "type": "git",
